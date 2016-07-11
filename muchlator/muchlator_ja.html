@@ -1,0 +1,132 @@
+﻿<html>
+<head>
+    <title>Muchlátor</title>
+    <style>
+        canvas, img {
+            padding-left: 0;
+            padding-right: 0;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+        #file {
+            padding-left: 0;
+            padding-right: 0;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 10px;
+            display: block;
+        }
+    </style>
+</head>
+<body bgcolor="0" text="white">
+    <center><img src="muchlator.png"></center>
+    <center><a href="muchlator.html">Nahrát jinou fotku na zmuchlání</a></center><br><br>
+    <img id="img" src="img_.jpg" width="0" height="0">
+    <canvas id="viewport" width="500" height="500" style="margin-bottom: 14px;"></canvas>
+    <script type="text/javascript">
+        var canvas = document.getElementById("viewport"); // HTMLCanvasElement
+        var image = document.getElementById("img");
+        var file = document.getElementById("file");
+        var qual = document.getElementById("quality");
+        var imageData, context, widthOrig, heightOrig, minPath, path, width, height, quality;
+        var time0;
+
+        function fileChange() {
+            if (file.files && file.files[0]) {
+                var reader = new FileReader();
+                reader.onload = start;
+                reader.readAsDataURL(file.files[0]);
+            }
+        };
+
+        function start(e) {
+            image.src = e.target.result;
+        }
+
+        img.onload = function () {
+            iter = 0;
+            quality = 0.3;//parseInt(qual.value, 10)/100;
+
+            heightOrig = image.naturalHeight;
+            widthOrig = image.naturalWidth;
+            width = widthOrig;
+            height = heightOrig;
+            canvas.width = widthOrig;
+            canvas.height = heightOrig;
+            context = canvas.getContext('2d'); // CanvasRenderingContext2D
+            context.drawImage(image, 0, 0);
+
+            imageData = context.getImageData(0, 0, canvas.width, canvas.height); // ImageData // Uint8ClampedArray
+            var data = imageData.data;
+            var length = data.length;
+
+            minPath = new Array((widthOrig + 2) * (heightOrig + 2));
+            path = new Array(widthOrig * heightOrig);
+
+            carveH(widthOrig, heightOrig, minPath, path, imageData);
+
+
+
+            //context.putImageData(imageData, 0, 0);
+
+        }
+
+        var w, iter = 0;
+
+        function carveH(widthOrig, heightOrig, minPath, path, imageData) {
+            if (typeof (Worker) !== "undefined") {
+                if (typeof (w) == "undefined") {
+                    w = new Worker("carve.js");
+                    w.postMessage({
+                        "widthOrig": widthOrig, "heightOrig": heightOrig, "width": width, "height": height,
+                        "minPath": minPath, "path": path, "imageData": imageData, "iter": iter, "quality": quality
+                    });
+                    time0 = new Date().getTime();
+                    iter++;
+                }
+                w.onmessage = function (event) {
+                    imageData = event.data.imageData;
+                    if (!(iter % 8)) {
+                        center = document.createElement("center");
+                        document.body.appendChild(center);
+
+                        var mycanvas = document.createElement("canvas");
+                        mycanvas.id = "mycanvas" + iter;
+                        mycanvas.width = event.data.height;
+                        mycanvas.height = event.data.width;
+                        document.body.appendChild(mycanvas);
+                        context = mycanvas.getContext('2d');
+                        context.putImageData(imageData, 0, 0);
+
+                        linebreak = document.createElement("br");
+                        document.body.appendChild(linebreak);
+
+                        window.scrollTo(0, document.body.scrollHeight);
+
+                    }
+                    w.terminate();
+                    w = undefined;
+                    time1 = new Date().getTime();
+                    //document.write((time1-time0) + "<br>");
+                    //width = event.data.width;
+                    //height = event.data.height;
+                    if (width > 0) {
+                        width = event.data.height;
+                        height = event.data.width;
+                        wo = widthOrig;
+                        ho = heightOrig;
+                        widthOrig = ho;
+                        heightOrig = wo;
+                        carveH(widthOrig, heightOrig, minPath, path, imageData);
+                        time0 = time1;
+                    }
+                };
+            } else {
+                document.write("Sorry! No Web Worker support.");
+            }
+        }
+    </script>
+
+</body>
+</html>
